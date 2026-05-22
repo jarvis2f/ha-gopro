@@ -1,0 +1,23 @@
+{
+  "domain": "opengopro",
+  "name": "OpenGoPro",
+  "after_dependencies": ["bluetooth", "media_source"],
+  "bluetooth": [
+    {
+      "local_name": "GoPro*"
+    },
+    {
+      "local_name": "HERO*"
+    },
+    {
+      "service_uuid": "0000fea6-0000-1000-8000-00805f9b34fb"
+    }
+  ],
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/local/opengopro-home-assistant",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "requirements": ["bleak==2.1.1"],
+  "version": "0.1.0"
+}

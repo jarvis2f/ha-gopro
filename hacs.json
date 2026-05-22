@@ -1,0 +1,6 @@
+{
+  "name": "OpenGoPro",
+  "render_readme": true,
+  "homeassistant": "2024.8.0",
+  "domains": ["button", "switch", "select", "sensor", "binary_sensor", "media_source"]
+}

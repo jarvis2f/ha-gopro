@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGoPro Console</title>
+    <script src="/assets/mpegts.min.js"></script>
+    <script type="module" src="/assets/opengopro-console.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #eef2ed;
+      }
+    </style>
+  </head>
+  <body>
+    <opengopro-console id="console"></opengopro-console>
+    <script type="module">
+      const view = document.querySelector("#console");
+      const params = new URLSearchParams(window.location.search);
+      const locale = params.get("lang")
+        || window.localStorage.getItem("opengopro_locale")
+        || navigator.language
+        || "en";
+      const isChinese = locale.toLowerCase().startsWith("zh");
+      document.documentElement.lang = locale;
+      document.title = isChinese ? "OpenGoPro 控制台" : "OpenGoPro Console";
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        });
+        const payload = await response.json();
+        if (!response.ok) throw payload;
+        return payload;
+      }
+
+      function errorDetail(error) {
+        return {
+          name: error?.name || "Error",
+          message: error?.message || String(error),
+          stack: error?.stack || null,
+        };
+      }
+
+      async function optionalApi(path, timeout = 90000, options = {}) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        try {
+          return await api(path, { ...options, signal: controller.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function streamApi(path, payload, onEvent) {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw await response.json();
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalEvent = null;
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line);
+            finalEvent = event;
+            onEvent?.(event);
+            if (event.type === "error") throw event;
+          }
+        }
+        if (buffer.trim()) {
+          const event = JSON.parse(buffer);
+          finalEvent = event;
+          onEvent?.(event);
+          if (event.type === "error") throw event;
+        }
+        return finalEvent || { ok: true };
+      }
+
+      view.adapter = {
+        label: isChinese ? "独立服务" : "Standalone",
+        locale,
+        listCameras: async () => {
+          const data = await api("/api/cameras");
+          return data.cameras.map((camera) => ({
+            ...camera,
+            id: camera.id,
+            phase: camera.phase || "not_loaded",
+            endpoint: `${camera.http_scheme}://${camera.http_host}:${camera.http_port}`,
+          }));
+        },
+        loadState: async (id) => {
+          try {
+            return await optionalApi(`/api/cameras/${id}/state`);
+          } catch (error) {
+            throw {
+              error: error?.error || error?.message || error?.name || (isChinese ? "状态读取失败" : "State read failed"),
+              status_detail: error?.trace || error?.recovery_error ? error : errorDetail(error),
+            };
+          }
+        },
+        loadPresence: async (id) => optionalApi(`/api/cameras/${id}/presence`, 12000),
+        loadPreviewStatus: async (id) => api(`/api/cameras/${id}/preview/status`),
+        previewUrl: (id) => `/api/cameras/${id}/preview.ts`,
+        command: async (id, command, extra = {}) => {
+          const payload = command === "set_mode"
+            ? { command: "mode", mode: extra.mode }
+            : command === "set_setting"
+              ? { command: "setting", setting: extra.setting, option: extra.option }
+              : command === "set_preset"
+                ? { command: "preset", preset: extra.preset }
+              : { command, ...extra };
+          return api(`/api/cameras/${id}/command`, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+        },
+        loadMedia: async (id) => {
+          const data = await api(`/api/cameras/${id}/media`);
+          return data.media;
+        },
+        loadPresets: async (id) => api(`/api/cameras/${id}/presets`),
+        scan: async () => api("/api/scan", {
+          method: "POST",
+          body: JSON.stringify({ timeout: 10 }),
+        }),
+        scanAccessPoints: async (payload) => optionalApi("/api/cohn/access-points", 100000, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+        provisionCohn: async (payload) => optionalApi("/api/cohn/provision", 450000, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+        provisionCohnStream: async (payload, onEvent) =>
+          streamApi("/api/cohn/provision/stream", payload, onEvent),
+      };
+    </script>
+  </body>
+</html>

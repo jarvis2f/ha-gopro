@@ -1,0 +1,17 @@
+venv/
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.DS_Store
+.env
+dist/
+data/*.json
+*.crt
+*.key
+*.pem

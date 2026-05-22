@@ -1,0 +1,235 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "添加 OpenGoPro 相机",
+        "description": "已发现附近可能的 GoPro BLE 设备。请选择一个设备，或选择手动输入地址。",
+        "data": {
+          "device": "发现的设备"
+        }
+      },
+      "manual": {
+        "title": "手动添加 OpenGoPro 相机",
+        "description": "如果自动发现没有列出相机，请输入 GoPro 的 BLE 地址。AP 模式通常保持默认 HTTP 设置；HERO12 及更新机型使用 COHN 时可填写局域网 HTTPS 参数。",
+        "data": {
+          "name": "名称",
+          "address": "BLE 地址",
+          "http_scheme": "HTTP 协议",
+          "http_host": "相机 HTTP 主机",
+          "http_port": "HTTP 端口",
+          "http_username": "HTTP 用户名",
+          "http_password": "HTTP 密码",
+          "verify_ssl": "校验 HTTPS 证书"
+        }
+      },
+      "discovery_confirm": {
+        "title": "添加发现的 GoPro",
+        "description": "要设置 {name} 吗？"
+      }
+    },
+    "abort": {
+      "already_configured": "这台相机已经配置过",
+      "no_discovery": "蓝牙发现数据已不可用"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "OpenGoPro 选项",
+        "data": {
+          "poll_interval": "状态轮询间隔",
+          "keep_alive": "连接时发送 Keep Alive",
+          "keep_alive_interval": "Keep Alive 间隔"
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "wake": { "name": "唤醒" },
+      "sleep": { "name": "休眠" },
+      "reconnect": { "name": "重新连接" },
+      "shutter": { "name": "快门" },
+      "refresh_media": { "name": "刷新媒体" }
+    },
+    "switch": {
+      "recording": { "name": "录制" }
+    },
+    "select": {
+      "camera_mode": { "name": "模式" },
+      "preset": { "name": "Preset" }
+    },
+    "sensor": {
+      "battery": { "name": "电量" },
+      "remaining_storage": { "name": "剩余存储" },
+      "current_mode": { "name": "当前模式" },
+      "temperature": { "name": "温度" },
+      "recording_state": {
+        "name": "录制状态",
+        "state": {
+          "idle": "空闲",
+          "recording": "录制中"
+        }
+      },
+      "sd_card_status": { "name": "SD 卡" },
+      "wifi_status": {
+        "name": "Wi-Fi",
+        "state": {
+          "off": "关闭",
+          "on": "开启"
+        }
+      },
+      "ble_status": {
+        "name": "蓝牙",
+        "state": {
+          "connected": "已连接",
+          "disconnected": "未连接"
+        }
+      },
+      "model": { "name": "型号" },
+      "firmware": { "name": "固件" },
+      "connection_phase": {
+        "name": "连接阶段",
+        "state": {
+          "ble_connected": "蓝牙已连接",
+          "disconnected": "未连接",
+          "http_ready": "HTTP 就绪",
+          "wifi_enabled": "Wi-Fi 已开启"
+        }
+      }
+    },
+    "binary_sensor": {
+      "connected": { "name": "已连接" },
+      "http_ready": { "name": "HTTP 就绪" },
+      "overheating": { "name": "过热" },
+      "sd_card_present": { "name": "SD 卡存在" },
+      "recording": { "name": "录制中" }
+    }
+  },
+  "services": {
+    "wake": {
+      "name": "唤醒相机",
+      "description": "通过蓝牙唤醒一个或多个已配置的 GoPro 相机。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        }
+      }
+    },
+    "guard_wake": {
+      "name": "保活唤醒窗口",
+      "description": "短暂唤醒相机，让后续自动化仍处于蓝牙可唤醒窗口内。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        },
+        "hold": {
+          "name": "保持时间",
+          "description": "保持相机唤醒的秒数，然后允许相机重新休眠。"
+        }
+      }
+    },
+    "sleep": {
+      "name": "休眠相机",
+      "description": "让一个或多个已配置的 GoPro 相机进入休眠。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        }
+      }
+    },
+    "shutter": {
+      "name": "设置快门",
+      "description": "启动或停止相机拍摄。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        },
+        "active": {
+          "name": "启用",
+          "description": "打开或关闭拍摄。"
+        }
+      }
+    },
+    "set_mode": {
+      "name": "设置模式",
+      "description": "切换当前拍摄模式。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        },
+        "mode": {
+          "name": "模式",
+          "description": "要启用的拍摄模式。"
+        }
+      }
+    },
+    "set_preset": {
+      "name": "设置 Preset",
+      "description": "按 ID 或名称切换当前 preset。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        },
+        "preset": {
+          "name": "Preset ID 或名称",
+          "description": "Preset 标识符或显示名称。"
+        }
+      }
+    },
+    "set_setting": {
+      "name": "设置参数",
+      "description": "向当前相机写入 OpenGoPro setting option。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        },
+        "setting": {
+          "name": "Setting",
+          "description": "OpenGoPro setting ID。"
+        },
+        "option": {
+          "name": "Option",
+          "description": "OpenGoPro option ID。"
+        }
+      }
+    },
+    "refresh_media": {
+      "name": "刷新媒体",
+      "description": "刷新一个或多个相机的媒体缓存。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        }
+      }
+    },
+    "start_preview": {
+      "name": "启动实时预览",
+      "description": "启动相机实时预览流，并通过 Home Assistant 暴露。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        }
+      }
+    },
+    "stop_preview": {
+      "name": "停止实时预览",
+      "description": "停止相机实时预览流。",
+      "fields": {
+        "name": {
+          "name": "相机名称",
+          "description": "可选的相机名称过滤。留空时作用于所有已配置相机。"
+        }
+      }
+    }
+  }
+}

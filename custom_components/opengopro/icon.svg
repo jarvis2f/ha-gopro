@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="OpenGoPro integration icon">
+  <defs>
+    <linearGradient id="bg" x1="36" y1="24" x2="220" y2="232" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16a6d9"/>
+      <stop offset="0.58" stop-color="#0b6fb7"/>
+      <stop offset="1" stop-color="#153f72"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="80" y1="76" x2="174" y2="174" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d7fbff"/>
+      <stop offset="0.34" stop-color="#58d7ef"/>
+      <stop offset="0.7" stop-color="#144e8f"/>
+      <stop offset="1" stop-color="#071a35"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <path d="M64 76c0-15.5 12.5-28 28-28h72c15.5 0 28 12.5 28 28v12h12c11 0 20 9 20 20v64c0 11-9 20-20 20H52c-11 0-20-9-20-20v-64c0-11 9-20 20-20h12V76Z" fill="#f7fbff"/>
+  <path d="M76 82c0-10 8-18 18-18h68c10 0 18 8 18 18v8H76v-8Z" fill="#173f68" opacity=".16"/>
+  <circle cx="128" cy="134" r="52" fill="#102c4e"/>
+  <circle cx="128" cy="134" r="42" fill="url(#lens)"/>
+  <circle cx="113" cy="119" r="13" fill="#e8ffff" opacity=".86"/>
+  <circle cx="142" cy="146" r="22" fill="#071b34" opacity=".4"/>
+  <rect x="178" y="104" width="28" height="18" rx="6" fill="#163f68"/>
+  <path d="M48 204h34v18H48v-18Zm42 0h34v18H90v-18Zm42 0h34v18h-34v-18Zm42 0h34v18h-34v-18Z" fill="#f7fbff"/>
+  <path d="M56 34h144c12 0 22 10 22 22v34" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity=".28"/>
+</svg>

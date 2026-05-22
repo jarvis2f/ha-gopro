@@ -1,0 +1,119 @@
+wake:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+guard_wake:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+    hold:
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+          unit_of_measurement: s
+      name: Hold time
+      required: false
+      default: 3
+sleep:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+shutter:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+    active:
+      selector:
+        boolean:
+      name: Active
+      required: true
+set_mode:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+    mode:
+      selector:
+        select:
+          options:
+            - video
+            - photo
+            - timelapse
+      name: Mode
+      required: true
+set_preset:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+    preset:
+      selector:
+        text:
+      name: Preset ID or name
+      required: true
+set_setting:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+    setting:
+      selector:
+        text:
+      name: Setting
+      required: true
+    option:
+      selector:
+        text:
+      name: Option
+      required: true
+refresh_media:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+start_preview:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
+stop_preview:
+  target:
+  fields:
+    name:
+      selector:
+        text:
+      name: Camera name
+      required: false
