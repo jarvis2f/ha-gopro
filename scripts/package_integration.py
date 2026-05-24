@@ -12,7 +12,7 @@ TARGET = DIST / "opengopro-custom-component.zip"
 
 
 def main() -> None:
-    """创建可复制到 Home Assistant 配置目录的 zip 包。"""
+    """创建 HACS zip_release 可下载的集成 zip 包。"""
     if not SOURCE.is_dir():
         raise SystemExit(f"集成目录不存在: {SOURCE}")
 
@@ -21,7 +21,7 @@ def main() -> None:
         for path in sorted(SOURCE.rglob("*")):
             if path.is_dir() or "__pycache__" in path.parts:
                 continue
-            archive.write(path, path.relative_to(ROOT))
+            archive.write(path, path.relative_to(SOURCE))
 
     print(TARGET)
 

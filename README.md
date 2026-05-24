@@ -46,6 +46,8 @@ venv/bin/python scripts/package_integration.py
 config/custom_components/opengopro/manifest.json
 ```
 
+当前 zip 的根目录直接包含 `manifest.json`、`__init__.py` 等集成文件。手动安装时请先创建 `config/custom_components/opengopro`，再把 zip 解压到该目录内。
+
 重启 Home Assistant 后，可用 `.env` 中的长期访问令牌做 smoke check：
 
 ```bash
