@@ -157,6 +157,7 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 async_get_clientsession(self.hass),
                 self._discovery.address,
                 name=self._discovered_name,
+                ble_device=getattr(self._discovery, "device", None),
             )
             try:
                 credentials = await client.async_provision_cohn(

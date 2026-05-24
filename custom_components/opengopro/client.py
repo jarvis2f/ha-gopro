@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from aiohttp import BasicAuth, ClientError, ClientSession
 
@@ -44,10 +44,12 @@ class OpenGoProClient:
         http_password: str | None = None,
         verify_ssl: bool = True,
         ble_device: Any | None = None,
+        ble_device_callback: Callable[[], Any | None] | None = None,
     ) -> None:
         self._session = session
         self.ble_address = ble_address
         self._ble_device = ble_device
+        self._ble_device_callback = ble_device_callback
         self.name = name or "GoPro"
         self.http_host = http_host
         self.http_port = http_port
@@ -77,20 +79,35 @@ class OpenGoProClient:
         """
         try:
             from bleak import BleakClient
+            from bleak.backends.device import BLEDevice
+            from bleak_retry_connector import establish_connection
         except ImportError as err:  # pragma: no cover - HA installs requirements
-            raise OpenGoProConnectionError("Bleak is not installed") from err
+            raise OpenGoProConnectionError("Bleak retry connector is not installed") from err
 
         if self._ble_client and self._ble_client.is_connected:
             self.phase = ConnectionPhase.BLE_CONNECTED
             return
 
-        client = BleakClient(self._ble_device or self.ble_address)
+        ble_device = self._ble_device
+        if ble_device is None and self._ble_device_callback is not None:
+            ble_device = self._ble_device_callback()
+        if ble_device is None:
+            ble_device = BLEDevice(self.ble_address, self.name, {})
         try:
-            await asyncio.wait_for(client.connect(), timeout=20)
+            client = await asyncio.wait_for(
+                establish_connection(
+                    BleakClient,
+                    ble_device,
+                    self.name,
+                    ble_device_callback=self._ble_device_callback,
+                ),
+                timeout=30,
+            )
         except Exception as err:  # noqa: BLE connection libraries raise broad errors
             detail = f"{type(err).__name__}: {err!r}"
             raise OpenGoProConnectionError(f"BLE connection failed: {detail}") from err
 
+        self._ble_device = ble_device
         self._ble_client = client
         await self._ble_start_notifications()
         self.phase = ConnectionPhase.BLE_CONNECTED

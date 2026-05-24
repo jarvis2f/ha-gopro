@@ -75,6 +75,9 @@ class FakeBleClient:
     async def write_gatt_char(self, uuid, data, *, response):
         self.writes.append((uuid, data, response))
 
+    async def start_notify(self, uuid, callback):
+        return None
+
     async def disconnect(self):
         self.disconnected = True
 
@@ -121,6 +124,41 @@ def test_base_url_supports_cohn_https_port():
     )
 
     assert client.base_url == "https://192.168.50.103:443"
+
+
+@pytest.mark.asyncio
+async def test_ble_connect_uses_retry_connector(monkeypatch):
+    import bleak_retry_connector
+
+    ble_device = object()
+    connected_client = FakeBleClient()
+    calls = {}
+
+    async def fake_establish_connection(client_class, device, name, **kwargs):
+        calls["device"] = device
+        calls["name"] = name
+        calls["kwargs"] = kwargs
+        return connected_client
+
+    monkeypatch.setattr(
+        bleak_retry_connector,
+        "establish_connection",
+        fake_establish_connection,
+    )
+    client = OpenGoProClient(
+        session=None,  # type: ignore[arg-type]
+        ble_address="AA:BB",
+        name="GoPro Test",
+        ble_device_callback=lambda: ble_device,
+    )
+
+    await client.async_ble_connect()
+
+    assert calls["device"] is ble_device
+    assert calls["name"] == "GoPro Test"
+    assert calls["kwargs"]["ble_device_callback"] is client._ble_device_callback
+    assert client._ble_client is connected_client
+    assert client.phase == ConnectionPhase.BLE_CONNECTED
 
 
 def test_packetize_always_uses_extended_headers():

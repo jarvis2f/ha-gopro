@@ -68,9 +68,11 @@ class OpenGoProCoordinator(DataUpdateCoordinator[CameraSnapshot]):
         session: Any,
     ) -> OpenGoProCoordinator:
         """Create a coordinator from config entry data."""
+        ble_address = entry.data[CONF_BLE_ADDRESS]
+        ble_device_callback = _ble_device_callback(hass, ble_address)
         client = OpenGoProClient(
             session,
-            entry.data[CONF_BLE_ADDRESS],
+            ble_address,
             name=entry.title,
             http_host=entry.data.get(CONF_HTTP_HOST, DEFAULT_HTTP_HOST),
             http_port=entry.data.get(CONF_HTTP_PORT, DEFAULT_HTTP_PORT),
@@ -78,6 +80,8 @@ class OpenGoProCoordinator(DataUpdateCoordinator[CameraSnapshot]):
             http_username=entry.data.get(CONF_HTTP_USERNAME),
             http_password=entry.data.get(CONF_HTTP_PASSWORD),
             verify_ssl=entry.data.get(CONF_VERIFY_SSL, True),
+            ble_device=ble_device_callback(),
+            ble_device_callback=ble_device_callback,
         )
         return cls(hass, entry, client, hass.data[PREVIEW_MANAGER_KEY])
 
@@ -219,3 +223,16 @@ class OpenGoProCoordinator(DataUpdateCoordinator[CameraSnapshot]):
                 raise
             except Exception as err:  # noqa: BLE/HTTP libraries raise broad errors
                 _LOGGER.debug("Keep Alive failed: %s", err)
+
+
+def _ble_device_callback(hass: HomeAssistant, address: str):
+    """Return a callback that resolves the latest HA BLEDevice for an address."""
+
+    def resolve() -> Any | None:
+        try:
+            from homeassistant.components import bluetooth
+        except Exception:
+            return None
+        return bluetooth.async_ble_device_from_address(hass, address, connectable=True)
+
+    return resolve
