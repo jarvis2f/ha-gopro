@@ -1,5 +1,7 @@
 # OpenGoPro for Home Assistant
 
+[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jarvis2f&repository=ha-gopro&category=integration)
+
 用于 Home Assistant 的 GoPro 自定义集成，通过 BLE 唤醒/连接流程和相机 HTTP API 控制兼容 OpenGoPro 的 GoPro 相机。
 
 ## v1 功能
@@ -15,6 +17,17 @@
 - HERO12 及更新机型的 COHN 配网、相机可见 Wi-Fi AP 扫描和 COHN 进度流目前由 standalone 网页控制台提供；HA 端可通过 WebSocket 扫描已配置相机可见的 Wi-Fi AP。
 
 ## 安装
+
+### HACS
+
+点击上方 HACS badge，或在 HACS 中添加自定义仓库：
+
+- Repository: `https://github.com/jarvis2f/ha-gopro`
+- Category: `Integration`
+
+添加后在 HACS 下载 `OpenGoPro`，重启 Home Assistant，然后在 **设置 > 设备与服务 > 添加集成 > OpenGoPro** 中添加集成。
+
+### 手动安装
 
 1. 将 `custom_components/opengopro` 复制到 Home Assistant 的 `custom_components` 目录。
 2. 重启 Home Assistant。

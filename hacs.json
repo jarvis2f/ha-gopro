@@ -1,6 +1,7 @@
 {
   "name": "OpenGoPro",
-  "render_readme": true,
+  "zip_release": true,
+  "filename": "opengopro-custom-component.zip",
   "homeassistant": "2024.8.0",
-  "domains": ["button", "switch", "select", "sensor", "binary_sensor", "media_source"]
+  "hacs": "2.0.0"
 }
