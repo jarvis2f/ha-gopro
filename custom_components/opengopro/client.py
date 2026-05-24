@@ -63,6 +63,7 @@ class OpenGoProClient:
         self._ble_accumulators: dict[str, _BlePacketAccumulator] = {}
         self._preview_active = False
         self.last_provision_stage = "idle"
+        self.last_ble_device_info: dict[str, Any] = {}
         self.last_connect_trace: list[dict[str, Any]] = []
         self.last_notification_trace: list[dict[str, Any]] = []
 
@@ -94,15 +95,17 @@ class OpenGoProClient:
             ble_device = self._ble_device_callback()
         if ble_device is None:
             ble_device = BLEDevice(self.ble_address, self.name, {})
+        self.last_ble_device_info = {
+            "address": getattr(ble_device, "address", self.ble_address),
+            "name": getattr(ble_device, "name", None),
+            "source": "synthetic" if getattr(ble_device, "details", None) == {} else "bluetooth_cache",
+        }
         try:
-            client = await asyncio.wait_for(
-                establish_connection(
-                    BleakClient,
-                    ble_device,
-                    self.name,
-                    ble_device_callback=self._ble_device_callback,
-                ),
-                timeout=30,
+            client = await establish_connection(
+                BleakClient,
+                ble_device,
+                self.name,
+                ble_device_callback=self._ble_device_callback,
             )
         except Exception as err:  # noqa: BLE connection libraries raise broad errors
             detail = f"{type(err).__name__}: {err!r}"

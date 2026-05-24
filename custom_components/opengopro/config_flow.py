@@ -161,6 +161,7 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._discovery.address,
                 name=self._discovered_name,
                 ble_device=getattr(self._discovery, "device", None),
+                ble_device_callback=_ble_device_callback(self.hass, self._discovery.address),
             )
             try:
                 credentials = await client.async_provision_cohn(
@@ -172,10 +173,11 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except OpenGoProError as err:
                 _LOGGER.exception(
                     "COHN provisioning failed for %s at stage %s: %s; "
-                    "notification_trace=%s connect_trace=%s",
+                    "ble_device=%s notification_trace=%s connect_trace=%s",
                     self._discovery.address,
                     getattr(client, "last_provision_stage", "unknown"),
                     err,
+                    getattr(client, "last_ble_device_info", {}),
                     getattr(client, "last_notification_trace", []),
                     getattr(client, "last_connect_trace", []),
                 )
@@ -371,3 +373,16 @@ def _async_discovered_service_info(hass: Any) -> list[BluetoothServiceInfoBleak]
     from homeassistant.components import bluetooth
 
     return list(bluetooth.async_discovered_service_info(hass))
+
+
+def _ble_device_callback(hass: Any, address: str):
+    """Return a callback that resolves the latest HA BLEDevice for an address."""
+
+    def resolve() -> Any | None:
+        try:
+            from homeassistant.components import bluetooth
+        except Exception:
+            return None
+        return bluetooth.async_ble_device_from_address(hass, address, connectable=True)
+
+    return resolve
