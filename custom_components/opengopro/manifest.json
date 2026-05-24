@@ -1,7 +1,7 @@
 {
   "domain": "opengopro",
   "name": "OpenGoPro",
-  "after_dependencies": ["bluetooth", "media_source"],
+  "after_dependencies": ["bluetooth", "http", "media_source"],
   "bluetooth": [
     {
       "local_name": "GoPro*"
