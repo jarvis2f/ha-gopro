@@ -4,7 +4,12 @@ from unittest.mock import patch
 import pytest
 
 from custom_components.opengopro.config_flow import (
+    CONF_CONNECTION_MODE,
     CONF_DEVICE,
+    CONF_WIFI_PASSWORD,
+    CONF_WIFI_SSID,
+    CONNECTION_MODE_AP,
+    CONNECTION_MODE_COHN,
     MANUAL_DEVICE,
     OpenGoProConfigFlow,
     _device_label,
@@ -12,6 +17,7 @@ from custom_components.opengopro.config_flow import (
 )
 from custom_components.opengopro.const import (
     CONF_BLE_ADDRESS,
+    CONF_COHN_SSID,
     CONF_HTTP_HOST,
     CONF_HTTP_PASSWORD,
     CONF_HTTP_PORT,
@@ -93,6 +99,11 @@ async def test_bluetooth_flow_creates_entry_from_discovery():
 
         result = await flow.async_step_discovery_confirm({})
 
+        assert result["type"] == "form"
+        assert result["step_id"] == "network"
+
+        result = await flow.async_step_network({CONF_CONNECTION_MODE: CONNECTION_MODE_AP})
+
     assert result["type"] == "create_entry"
     assert result["data"][CONF_BLE_ADDRESS] == "AA:BB:CC:DD:EE:FF"
     assert result["data"][CONF_HTTP_HOST] == "10.5.5.9"
@@ -150,8 +161,68 @@ async def test_user_flow_selecting_discovered_device_creates_entry():
     ):
         result = await flow.async_step_user({CONF_DEVICE: "AA"})
 
+        assert result["type"] == "form"
+        assert result["step_id"] == "network"
+
+        result = await flow.async_step_network({CONF_CONNECTION_MODE: CONNECTION_MODE_AP})
+
     assert result["type"] == "create_entry"
     assert result["data"][CONF_BLE_ADDRESS] == "AA"
+
+
+@pytest.mark.asyncio
+async def test_discovery_flow_can_provision_cohn_credentials():
+    flow = OpenGoProConfigFlow()
+    flow.hass = object()
+
+    credentials = SimpleNamespace(
+        ip_address="192.168.50.103",
+        username="gopro",
+        password="secret",
+        ssid="Home WiFi",
+        mac_address="00:11:22:33:44:55",
+    )
+
+    async def fake_provision(self, ssid, password, **kwargs):
+        assert ssid == "Home WiFi"
+        assert password == "wifi-pass"
+        assert kwargs["force_new_credentials"] is True
+        return credentials
+
+    with (
+        patch.object(flow, "async_set_unique_id", return_value=None),
+        patch.object(flow, "_abort_if_unique_id_configured", return_value=None),
+        patch.object(flow, "_set_confirm_only", return_value=None),
+        patch(
+            "custom_components.opengopro.config_flow.async_get_clientsession",
+            return_value=object(),
+        ),
+        patch(
+            "custom_components.opengopro.config_flow.OpenGoProClient.async_provision_cohn",
+            fake_provision,
+        ),
+    ):
+        await flow.async_step_bluetooth(discovery())
+        await flow.async_step_discovery_confirm({})
+        result = await flow.async_step_network({CONF_CONNECTION_MODE: CONNECTION_MODE_COHN})
+        assert result["type"] == "form"
+        assert result["step_id"] == "cohn"
+
+        result = await flow.async_step_cohn(
+            {
+                CONF_WIFI_SSID: "Home WiFi",
+                CONF_WIFI_PASSWORD: "wifi-pass",
+            }
+        )
+
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_HTTP_SCHEME] == "https"
+    assert result["data"][CONF_HTTP_HOST] == "192.168.50.103"
+    assert result["data"][CONF_HTTP_PORT] == 443
+    assert result["data"][CONF_HTTP_USERNAME] == "gopro"
+    assert result["data"][CONF_HTTP_PASSWORD] == "secret"
+    assert result["data"][CONF_VERIFY_SSL] is False
+    assert result["data"][CONF_COHN_SSID] == "Home WiFi"
 
 
 @pytest.mark.asyncio

@@ -14,7 +14,7 @@
 - 在 `/opengopro` 提供侧边栏面板，包含连接、拍摄控制、状态、媒体、BLE presence 和 Live Preview 播放。
 - Home Assistant 和 standalone 都使用 UDP MPEG-TS relay，并由浏览器端 `mpegts.js` 播放预览流；不依赖运行时 `ffmpeg`。
 - Home Assistant 配置流、选项、实体和服务提供英文/简体中文翻译；共享网页控制台也支持英文/简体中文。
-- HERO12 及更新机型的 COHN 配网、相机可见 Wi-Fi AP 扫描和 COHN 进度流目前由 standalone 网页控制台提供；HA 端可通过 WebSocket 扫描已配置相机可见的 Wi-Fi AP。
+- HERO12 及更新机型支持通过 HA config flow 或 standalone 网页控制台执行 COHN 配网，并支持扫描相机可见的 Wi-Fi AP。
 
 ## 安装
 

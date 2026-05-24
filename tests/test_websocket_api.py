@@ -10,7 +10,16 @@ from custom_components.opengopro.websocket_api import (
 
 def test_coordinator_payload_is_panel_safe():
     coordinator = SimpleNamespace(
-        config_entry=SimpleNamespace(entry_id="entry-1", title="Desk GoPro"),
+        config_entry=SimpleNamespace(
+            entry_id="entry-1",
+            title="Desk GoPro",
+            data={
+                "http_scheme": "https",
+                "http_host": "192.168.50.103",
+                "http_port": 443,
+                "cohn_ssid": "Home WiFi",
+            },
+        ),
         client=SimpleNamespace(ble_address="AA:BB"),
         data=CameraSnapshot(
             phase=ConnectionPhase.HTTP_READY,
@@ -31,6 +40,8 @@ def test_coordinator_payload_is_panel_safe():
     assert payload["phase"] == "http_ready"
     assert payload["battery"] == 88
     assert payload["recording"] is True
+    assert payload["http_host"] == "192.168.50.103"
+    assert payload["cohn_ssid"] == "Home WiFi"
     assert payload["modes"] == ["video", "photo", "timelapse"]
 
 

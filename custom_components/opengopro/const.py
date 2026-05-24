@@ -16,6 +16,8 @@ CONF_HTTP_SCHEME = "http_scheme"
 CONF_HTTP_USERNAME = "http_username"
 CONF_HTTP_PASSWORD = "http_password"
 CONF_VERIFY_SSL = "verify_ssl"
+CONF_COHN_SSID = "cohn_ssid"
+CONF_COHN_MAC_ADDRESS = "cohn_mac_address"
 
 DEFAULT_HTTP_HOST = "10.5.5.9"
 DEFAULT_HTTP_PORT = 8080

@@ -98,7 +98,7 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     try:
         from homeassistant.components import panel_custom
 
-        panel_custom.async_register_panel(
+        await panel_custom.async_register_panel(
             hass,
             frontend_url_path=PANEL_PATH,
             webcomponent_name="opengopro-panel",

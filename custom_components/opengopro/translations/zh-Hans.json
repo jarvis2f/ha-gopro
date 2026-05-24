@@ -25,7 +25,25 @@
       "discovery_confirm": {
         "title": "添加发现的 GoPro",
         "description": "要设置 {name} 吗？"
+      },
+      "network": {
+        "title": "选择 GoPro 连接方式",
+        "description": "{name} 可以通过 COHN 配置到家庭 Wi-Fi，也可以保留 GoPro AP 模式，前提是 Home Assistant 能访问 10.5.5.9。",
+        "data": {
+          "connection_mode": "连接方式"
+        }
+      },
+      "cohn": {
+        "title": "配置家庭 Wi-Fi",
+        "description": "请保持 {name} 开机并靠近 Home Assistant。Home Assistant 会通过蓝牙写入这些 Wi-Fi 凭据，并保存相机返回的局域网 HTTPS 连接信息。",
+        "data": {
+          "wifi_ssid": "家庭 Wi-Fi SSID",
+          "wifi_password": "家庭 Wi-Fi 密码"
+        }
       }
+    },
+    "error": {
+      "provision_failed": "无法将相机配置到家庭 Wi-Fi"
     },
     "abort": {
       "already_configured": "这台相机已经配置过",

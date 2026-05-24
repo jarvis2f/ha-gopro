@@ -9,9 +9,13 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .client import OpenGoProClient, OpenGoProError
 from .const import (
     CONF_BLE_ADDRESS,
+    CONF_COHN_MAC_ADDRESS,
+    CONF_COHN_SSID,
     CONF_HTTP_HOST,
     CONF_HTTP_PASSWORD,
     CONF_HTTP_PORT,
@@ -30,7 +34,12 @@ else:
     BluetoothServiceInfoBleak = Any
 
 CONF_DEVICE = "device"
+CONF_CONNECTION_MODE = "connection_mode"
+CONF_WIFI_SSID = "wifi_ssid"
+CONF_WIFI_PASSWORD = "wifi_password"
 MANUAL_DEVICE = "__manual__"
+CONNECTION_MODE_COHN = "cohn"
+CONNECTION_MODE_AP = "ap"
 GOPRO_NAME_PREFIXES = ("gopro", "hero")
 GOPRO_BLE_SERVICE_UUID = "0000fea6-0000-1000-8000-00805f9b34fb"
 GOPRO_BLE_SERVICE_UUID_SHORT = "fea6"
@@ -44,6 +53,7 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._discovery: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
+        self._discovered_name: str = "GoPro"
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -53,6 +63,7 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
         self._discovery = discovery_info
+        self._discovered_name = name
         return await self.async_step_discovery_confirm()
 
     async def async_step_discovery_confirm(
@@ -64,17 +75,8 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         name = self._discovery.name or self._discovery.advertisement.local_name or "GoPro"
         if user_input is not None:
-            return self.async_create_entry(
-                title=name,
-                data={
-                    CONF_BLE_ADDRESS: self._discovery.address,
-                    CONF_NAME: name,
-                    CONF_HTTP_HOST: DEFAULT_HTTP_HOST,
-                    CONF_HTTP_PORT: DEFAULT_HTTP_PORT,
-                    CONF_HTTP_SCHEME: DEFAULT_HTTP_SCHEME,
-                    CONF_VERIFY_SSL: True,
-                },
-            )
+            self._discovered_name = name
+            return await self.async_step_network()
 
         self._set_confirm_only()
         return self.async_show_form(
@@ -88,7 +90,10 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             selected = user_input.get(CONF_DEVICE)
             if selected and selected != MANUAL_DEVICE:
                 self._discovery = self._discovered_devices[selected]
-                return await self.async_step_discovery_confirm({})  # confirm selection
+                self._discovered_name = (
+                    self._discovery.name or self._discovery.advertisement.local_name or "GoPro"
+                )
+                return await self.async_step_network()
             return await self.async_step_manual()
 
         self._load_discovered_devices()
@@ -108,6 +113,85 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             MANUAL_DEVICE: "手动输入 BLE 地址",
                         }
                     )
+                }
+            ),
+        )
+
+    async def async_step_network(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Choose whether to use COHN/LAN HTTPS or the camera AP."""
+        if self._discovery is None:
+            return self.async_abort(reason="no_discovery")
+
+        if user_input is not None:
+            mode = user_input[CONF_CONNECTION_MODE]
+            if mode == CONNECTION_MODE_AP:
+                return self._create_ap_entry()
+            return await self.async_step_cohn()
+
+        return self.async_show_form(
+            step_id="network",
+            description_placeholders={CONF_NAME: self._discovered_name},
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_CONNECTION_MODE,
+                        default=CONNECTION_MODE_COHN,
+                    ): vol.In(
+                        {
+                            CONNECTION_MODE_COHN: "Home Wi-Fi / COHN (recommended)",
+                            CONNECTION_MODE_AP: "GoPro AP mode (10.5.5.9)",
+                        }
+                    )
+                }
+            ),
+        )
+
+    async def async_step_cohn(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Provision Camera on Home Network credentials over BLE."""
+        if self._discovery is None:
+            return self.async_abort(reason="no_discovery")
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            client = OpenGoProClient(
+                async_get_clientsession(self.hass),
+                self._discovery.address,
+                name=self._discovered_name,
+            )
+            try:
+                credentials = await client.async_provision_cohn(
+                    user_input[CONF_WIFI_SSID],
+                    user_input[CONF_WIFI_PASSWORD],
+                    force_new_credentials=True,
+                    timeout=180,
+                )
+            except OpenGoProError:
+                errors["base"] = "provision_failed"
+            else:
+                return self.async_create_entry(
+                    title=self._discovered_name,
+                    data={
+                        CONF_BLE_ADDRESS: self._discovery.address,
+                        CONF_NAME: self._discovered_name,
+                        CONF_HTTP_HOST: credentials.ip_address,
+                        CONF_HTTP_PORT: 443,
+                        CONF_HTTP_SCHEME: "https",
+                        CONF_HTTP_USERNAME: credentials.username,
+                        CONF_HTTP_PASSWORD: credentials.password,
+                        CONF_VERIFY_SSL: False,
+                        CONF_COHN_SSID: credentials.ssid or user_input[CONF_WIFI_SSID],
+                        CONF_COHN_MAC_ADDRESS: credentials.mac_address,
+                    },
+                )
+
+        return self.async_show_form(
+            step_id="cohn",
+            errors=errors,
+            description_placeholders={CONF_NAME: self._discovered_name},
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_WIFI_SSID): str,
+                    vol.Required(CONF_WIFI_PASSWORD): str,
                 }
             ),
         )
@@ -157,6 +241,22 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_VERIFY_SSL, default=True): bool,
                 }
             ),
+        )
+
+    def _create_ap_entry(self) -> FlowResult:
+        """Create a default GoPro AP-mode entry from Bluetooth discovery."""
+        if self._discovery is None:
+            return self.async_abort(reason="no_discovery")
+        return self.async_create_entry(
+            title=self._discovered_name,
+            data={
+                CONF_BLE_ADDRESS: self._discovery.address,
+                CONF_NAME: self._discovered_name,
+                CONF_HTTP_HOST: DEFAULT_HTTP_HOST,
+                CONF_HTTP_PORT: DEFAULT_HTTP_PORT,
+                CONF_HTTP_SCHEME: DEFAULT_HTTP_SCHEME,
+                CONF_VERIFY_SSL: True,
+            },
         )
 
     def _load_discovered_devices(self) -> None:

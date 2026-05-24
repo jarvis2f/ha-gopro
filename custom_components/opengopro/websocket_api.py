@@ -11,7 +11,13 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import (
+    CONF_COHN_SSID,
+    CONF_HTTP_HOST,
+    CONF_HTTP_PORT,
+    CONF_HTTP_SCHEME,
+    DOMAIN,
+)
 from .coordinator import OpenGoProCoordinator
 
 
@@ -193,6 +199,10 @@ def _coordinator_payload(coordinator: OpenGoProCoordinator) -> dict[str, Any]:
         "entry_id": coordinator.config_entry.entry_id,
         "name": coordinator.config_entry.title,
         "ble_address": coordinator.client.ble_address,
+        "http_scheme": coordinator.config_entry.data.get(CONF_HTTP_SCHEME),
+        "http_host": coordinator.config_entry.data.get(CONF_HTTP_HOST),
+        "http_port": coordinator.config_entry.data.get(CONF_HTTP_PORT),
+        "cohn_ssid": coordinator.config_entry.data.get(CONF_COHN_SSID),
         "phase": data.phase.value if data else "unknown",
         "power": "on" if data and data.phase.value == "http_ready" else "standby",
         "http_ready": bool(data and data.phase.value == "http_ready"),

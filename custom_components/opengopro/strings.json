@@ -25,7 +25,25 @@
       "discovery_confirm": {
         "title": "Add discovered GoPro",
         "description": "Set up {name}?"
+      },
+      "network": {
+        "title": "Choose GoPro connection",
+        "description": "{name} can be configured for Home Wi-Fi with COHN, or kept in GoPro AP mode if Home Assistant can reach 10.5.5.9.",
+        "data": {
+          "connection_mode": "Connection mode"
+        }
+      },
+      "cohn": {
+        "title": "Configure Home Wi-Fi",
+        "description": "Keep {name} powered on and nearby. Home Assistant will send these Wi-Fi credentials over Bluetooth and save the camera's LAN HTTPS connection details.",
+        "data": {
+          "wifi_ssid": "Home Wi-Fi SSID",
+          "wifi_password": "Home Wi-Fi password"
+        }
       }
+    },
+    "error": {
+      "provision_failed": "Could not configure the camera on Home Wi-Fi"
     },
     "abort": {
       "already_configured": "This camera is already configured",
