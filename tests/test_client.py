@@ -271,13 +271,17 @@ async def test_provision_cohn_maps_numeric_status_fields_to_credentials():
     async def noop_clear():
         return None
 
-    async def noop_create():
+    stages = []
+
+    async def noop_create(*, override=False):
+        stages.append(("create", override))
         return None
 
     async def fake_cert():
         return "CERT"
 
-    async def fake_status(*, timeout):
+    async def fake_status(*, expected_status=None, expected_state=None, timeout):
+        stages.append(("status", expected_status, expected_state))
         return {
             3: b"gopro",
             4: b"secret",
@@ -300,6 +304,10 @@ async def test_provision_cohn_maps_numeric_status_fields_to_credentials():
     assert credentials.password == "secret"
     assert credentials.ip_address == "192.168.50.103"
     assert client.base_url == "https://192.168.50.103:443"
+    assert ("create", True) in stages
+    assert ("status", 0, None) in stages
+    assert ("status", 1, None) in stages
+    assert ("status", None, 27) in stages
 
 
 @pytest.mark.asyncio
@@ -352,6 +360,32 @@ async def test_connect_to_access_point_uses_provisioned_request_for_configured_a
     assert writes
     assert writes[0][1].startswith(bytes([2, 4]))
     assert b"new-password" not in writes[0][1]
+
+
+@pytest.mark.asyncio
+async def test_create_cohn_certificate_passes_override_flag():
+    client = OpenGoProClient(session=None, ble_address="AA:BB")  # type: ignore[arg-type]
+    writes = []
+
+    async def fake_write(uuid, payload):
+        writes.append((uuid, payload))
+
+    async def fake_wait(feature, action, operation):
+        assert feature == 0xF1
+        assert action == 0xE7
+        assert operation == "Create COHN certificate"
+
+    client._ble_write_payload = fake_write
+    client._wait_generic_protobuf_response = fake_wait
+
+    await client.async_create_cohn_certificate(override=True)
+
+    assert writes == [
+        (
+            GOPRO_COMMAND_UUID,
+            bytes([0xF1, 0x67, 0x08, 0x01]),
+        )
+    ]
 
 
 @pytest.mark.asyncio

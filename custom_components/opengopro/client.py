@@ -167,12 +167,25 @@ class OpenGoProClient:
         if clear_certificate:
             self.last_provision_stage = "clear_certificate"
             await self.async_clear_cohn_certificate()
+            self.last_provision_stage = "wait_cohn_unprovisioned"
+            await self.async_wait_cohn_status(
+                expected_status=protocol.PROTO_COHN_UNPROVISIONED,
+                timeout=timeout,
+            )
         self.last_provision_stage = "create_certificate"
-        await self.async_create_cohn_certificate()
+        await self.async_create_cohn_certificate(override=True)
+        self.last_provision_stage = "wait_cohn_provisioned"
+        await self.async_wait_cohn_status(
+            expected_status=protocol.PROTO_COHN_PROVISIONED,
+            timeout=timeout,
+        )
         self.last_provision_stage = "get_certificate"
         certificate = await self.async_get_cohn_certificate()
         self.last_provision_stage = "wait_cohn_status"
-        status = await self.async_wait_cohn_status(timeout=timeout)
+        status = await self.async_wait_cohn_status(
+            expected_state=protocol.PROTO_COHN_NETWORK_CONNECTED,
+            timeout=timeout,
+        )
         self.last_provision_stage = "cohn_status_received"
         credentials = CohnCredentials(
             certificate=certificate,
@@ -395,8 +408,10 @@ class OpenGoProClient:
         trace.append(
             {
                 "step": "connect_write",
-                "action": expected_response,
+                "request_action": request[1],
+                "expected_response_action": expected_response,
                 "matched_flags": matched.flags,
+                "matched_configured": matched.is_configured,
                 "payload_length": len(request),
                 "packet_lengths": [len(packet) for packet in _packetize_ble_payload(request)],
             }
@@ -445,11 +460,14 @@ class OpenGoProClient:
             "Clear COHN certificate",
         )
 
-    async def async_create_cohn_certificate(self) -> None:
+    async def async_create_cohn_certificate(self, *, override: bool = False) -> None:
         """Create a new COHN certificate."""
+        payload = bytes([protocol.PROTO_FEATURE_COMMAND, protocol.PROTO_ACTION_CREATE_COHN_CERT_REQ])
+        if override:
+            payload += _proto_bool(1, True)
         await self._ble_write_payload(
             protocol.GOPRO_COMMAND_UUID,
-            bytes([protocol.PROTO_FEATURE_COMMAND, protocol.PROTO_ACTION_CREATE_COHN_CERT_REQ]),
+            payload,
         )
         await self._wait_generic_protobuf_response(
             protocol.PROTO_FEATURE_COMMAND,
@@ -474,8 +492,14 @@ class OpenGoProClient:
                 raise OpenGoProCommandError("COHN certificate response did not include a certificate")
             return certificate
 
-    async def async_wait_cohn_status(self, *, timeout: float = 120) -> dict[int, Any]:
-        """Wait until COHN reports a connected home-network state."""
+    async def async_wait_cohn_status(
+        self,
+        *,
+        expected_status: int | None = None,
+        expected_state: int | None = None,
+        timeout: float = 120,
+    ) -> dict[int, Any]:
+        """Wait until COHN status matches the expected provision/network state."""
         await self._ble_write_payload(
             protocol.GOPRO_QUERY_UUID,
             bytes([protocol.PROTO_FEATURE_QUERY, protocol.PROTO_ACTION_GET_COHN_STATUS_REQ]) + _proto_bool(1, True),
@@ -486,7 +510,9 @@ class OpenGoProClient:
                 if feature != protocol.PROTO_FEATURE_QUERY or action != protocol.PROTO_ACTION_GET_COHN_STATUS_RSP:
                     continue
                 fields = _decode_protobuf_fields(message)
-                if _first_int(fields, 2) == protocol.PROTO_COHN_NETWORK_CONNECTED:
+                status_matches = expected_status is None or _first_int(fields, 1) == expected_status
+                state_matches = expected_state is None or _first_int(fields, 2) == expected_state
+                if status_matches and state_matches:
                     return fields
 
     async def async_wait_http_ready(self) -> None:
