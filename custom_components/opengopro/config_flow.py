@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -43,6 +44,8 @@ CONNECTION_MODE_AP = "ap"
 GOPRO_NAME_PREFIXES = ("gopro", "hero")
 GOPRO_BLE_SERVICE_UUID = "0000fea6-0000-1000-8000-00805f9b34fb"
 GOPRO_BLE_SERVICE_UUID_SHORT = "fea6"
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -166,7 +169,16 @@ class OpenGoProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     force_new_credentials=True,
                     timeout=180,
                 )
-            except OpenGoProError:
+            except OpenGoProError as err:
+                _LOGGER.exception(
+                    "COHN provisioning failed for %s at stage %s: %s; "
+                    "notification_trace=%s connect_trace=%s",
+                    self._discovery.address,
+                    getattr(client, "last_provision_stage", "unknown"),
+                    err,
+                    getattr(client, "last_notification_trace", []),
+                    getattr(client, "last_connect_trace", []),
+                )
                 errors["base"] = "provision_failed"
             else:
                 return self.async_create_entry(

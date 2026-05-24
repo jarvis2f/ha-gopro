@@ -15,6 +15,7 @@ from custom_components.opengopro.config_flow import (
     _device_label,
     _looks_like_gopro,
 )
+from custom_components.opengopro.models import OpenGoProConnectionError
 from custom_components.opengopro.const import (
     CONF_BLE_ADDRESS,
     CONF_COHN_SSID,
@@ -223,6 +224,48 @@ async def test_discovery_flow_can_provision_cohn_credentials():
     assert result["data"][CONF_HTTP_PASSWORD] == "secret"
     assert result["data"][CONF_VERIFY_SSL] is False
     assert result["data"][CONF_COHN_SSID] == "Home WiFi"
+
+
+@pytest.mark.asyncio
+async def test_discovery_flow_logs_cohn_provisioning_failure(caplog):
+    flow = OpenGoProConfigFlow()
+    flow.hass = object()
+
+    async def fake_provision(self, ssid, password, **kwargs):
+        self.last_provision_stage = "connect_wifi"
+        self.last_notification_trace = [{"uuid": "network", "ok": True}]
+        self.last_connect_trace = [{"step": "scan_done", "entries": [{"ssid": ssid}]}]
+        raise OpenGoProConnectionError("Wi-Fi provisioning timed out")
+
+    with (
+        patch.object(flow, "async_set_unique_id", return_value=None),
+        patch.object(flow, "_abort_if_unique_id_configured", return_value=None),
+        patch.object(flow, "_set_confirm_only", return_value=None),
+        patch(
+            "custom_components.opengopro.config_flow.async_get_clientsession",
+            return_value=object(),
+        ),
+        patch(
+            "custom_components.opengopro.config_flow.OpenGoProClient.async_provision_cohn",
+            fake_provision,
+        ),
+        caplog.at_level("ERROR", logger="custom_components.opengopro.config_flow"),
+    ):
+        await flow.async_step_bluetooth(discovery())
+        await flow.async_step_discovery_confirm({})
+        result = await flow.async_step_cohn(
+            {
+                CONF_WIFI_SSID: "Home WiFi",
+                CONF_WIFI_PASSWORD: "wifi-pass",
+            }
+        )
+
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "provision_failed"
+    assert "COHN provisioning failed" in caplog.text
+    assert "connect_wifi" in caplog.text
+    assert "notification_trace" in caplog.text
+    assert "wifi-pass" not in caplog.text
 
 
 @pytest.mark.asyncio

@@ -62,6 +62,7 @@ class OpenGoProClient:
         self._ble_response_queue: asyncio.Queue[bytes] = asyncio.Queue()
         self._ble_accumulators: dict[str, _BlePacketAccumulator] = {}
         self._preview_active = False
+        self.last_provision_stage = "idle"
         self.last_connect_trace: list[dict[str, Any]] = []
         self.last_notification_trace: list[dict[str, Any]] = []
 
@@ -149,8 +150,11 @@ class OpenGoProClient:
     ) -> CohnCredentials:
         """Provision HERO12+ Camera on the Home Network over BLE."""
         if self.phase == ConnectionPhase.DISCONNECTED:
+            self.last_provision_stage = "ble_connect"
             await self.async_ble_connect()
+        self.last_provision_stage = "set_datetime"
         await self.async_set_local_datetime()
+        self.last_provision_stage = "connect_wifi"
         await self.async_connect_to_access_point(
             ssid,
             password,
@@ -158,10 +162,15 @@ class OpenGoProClient:
             timeout=timeout,
         )
         if clear_certificate:
+            self.last_provision_stage = "clear_certificate"
             await self.async_clear_cohn_certificate()
+        self.last_provision_stage = "create_certificate"
         await self.async_create_cohn_certificate()
+        self.last_provision_stage = "get_certificate"
         certificate = await self.async_get_cohn_certificate()
+        self.last_provision_stage = "wait_cohn_status"
         status = await self.async_wait_cohn_status(timeout=timeout)
+        self.last_provision_stage = "cohn_status_received"
         credentials = CohnCredentials(
             certificate=certificate,
             username=_first_string(status, 3) or "",
@@ -177,6 +186,7 @@ class OpenGoProClient:
         self.http_port = 443
         self.http_username = credentials.username
         self.http_password = credentials.password
+        self.last_provision_stage = "done"
         return credentials
 
     async def async_set_local_datetime(self) -> None:
