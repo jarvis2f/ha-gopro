@@ -35,6 +35,8 @@ SERVICE_REFRESH_MEDIA = "refresh_media"
 SERVICE_START_PREVIEW = "start_preview"
 SERVICE_STOP_PREVIEW = "stop_preview"
 
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up OpenGoPro component-level resources."""
