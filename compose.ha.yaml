@@ -1,0 +1,14 @@
+services:
+  gopro-ctl:
+    build: .
+    image: gopro-ctl:local
+    container_name: gopro-ctl
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      GOPRO_BLE_BACKEND: home_assistant
+      GOPRO_HA_URL: ${GOPRO_HA_URL:?Set GOPRO_HA_URL in .env}
+      GOPRO_HA_TOKEN: ${GOPRO_HA_TOKEN:?Set GOPRO_HA_TOKEN in .env}
+    volumes:
+      - ./data:/data

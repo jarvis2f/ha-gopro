@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from standalone import ble_runtime
+import ble_runtime
 
 
 def discovery(

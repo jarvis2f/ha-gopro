@@ -1,144 +1,93 @@
-# OpenGoPro for Home Assistant
+# gopro-ctl
 
-[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jarvis2f&repository=ha-gopro&category=integration)
+通过 BLE 和 OpenGoPro HTTP API 控制兼容的 GoPro 相机的 Docker 服务，提供网页控制台、媒体浏览、实时预览和定时唤醒。
 
-用于 Home Assistant 的 GoPro 自定义集成，通过 BLE 唤醒/连接流程和相机 HTTP API 控制兼容 OpenGoPro 的 GoPro 相机。
+## 功能
 
-## v1 功能
+- 扫描 GoPro BLE 设备，唤醒、休眠和连接相机。
+- 控制拍摄与相机设置，读取状态，浏览和下载媒体。
+- 为支持 COHN 的相机配置 Wi-Fi，扫描相机可见的接入点。
+- 接收相机 UDP MPEG-TS 预览，通过网页播放。
+- 配置每日唤醒和提前刷新 BLE 唤醒窗口；网页支持英文和简体中文。
+- 创建一次性、每日、指定星期或自定义 Cron 的照片、视频和延时拍摄计划；也可按经纬度计算的日落时间触发。
 
-- 支持兼容 OpenGoPro 相机的 BLE 发现和 config flow。自动发现同时识别 `GoPro*` / `HERO*` 名称和官方 `0xFEA6` BLE service UUID。
-- 支持一键唤醒流程：BLE 连接、启用相机 Wi-Fi、HTTP 就绪检查和 Keep Alive 管理。
-- 支持 `guard_wake` 服务，用于 Home Assistant Automation 在目标时间前刷新 8 小时 BLE 唤醒窗口，然后让相机回到睡眠状态。
-- 提供录制、快门、唤醒、休眠、重连、模式、预设和状态等实体。
-- 接入 Home Assistant Media Browser，用于浏览相机媒体文件，并通过认证代理下载或播放。
-- 在 `/opengopro` 提供侧边栏面板，包含连接、拍摄控制、状态、媒体、BLE presence 和 Live Preview 播放。
-- Home Assistant 和 standalone 都使用 UDP MPEG-TS relay，并由浏览器端 `mpegts.js` 播放预览流；不依赖运行时 `ffmpeg`。
-- Home Assistant 配置流、选项、实体和服务提供英文/简体中文翻译；共享网页控制台也支持英文/简体中文。
-- HERO12 及更新机型支持通过 HA config flow 或 standalone 网页控制台执行 COHN 配网，并支持扫描相机可见的 Wi-Fi AP。
+## Home Assistant 蓝牙桥接
 
-## 安装
+当蓝牙适配器或 ESPHome 蓝牙代理已由 Home Assistant 管理时，可以让 gopro-ctl 通过 HA 执行 BLE 操作。HA 继续负责选择可连接的适配器和管理连接槽；相机的 HTTP 控制、媒体和预览仍由 gopro-ctl 直接通过局域网访问。扫描、唤醒、休眠、Wi-Fi 扫描和 COHN 配置，以及拍摄计划的定期唤醒均使用同一个桥接后端。
 
-### HACS
+1. 在项目目录执行 `python3 tools/build_ha_bridge.py`，生成 `dist/gopro_ble_bridge.zip`。将压缩包内的 `custom_components/gopro_ble_bridge` 目录复制到 Home Assistant 配置目录的 `custom_components/` 下。
+2. 在 HA 的 `configuration.yaml` 中加入一行 `gopro_ble_bridge:`，检查配置并重启 HA。该集成依赖 HA 的 Bluetooth 集成，ESPHome 代理必须支持主动连接。更新 gopro-ctl 后重新构建并复制压缩包中的目录，再重启 HA，以保持两端 BLE 实现一致。
+3. 在 gopro-ctl 所在机器创建仅本机可读的 `.env` 文件，设置 `GOPRO_HA_URL=https://你的HA地址:8123` 和 `GOPRO_HA_TOKEN=你的HA长期访问令牌`。令牌须属于 HA 管理员；勿提交或分享令牌。HA URL 应使用可信 HTTPS，尤其是跨不可信网络时。
+4. 在 Linux 部署机器运行 `docker compose -f compose.ha.yaml up -d --build`。此配置不需要将蓝牙或 D-Bus 直通给 gopro-ctl；HA 和相机仍需网络可达。使用其他部署方式时，设置 `GOPRO_BLE_BACKEND=home_assistant`、`GOPRO_HA_URL` 和 `GOPRO_HA_TOKEN`；默认 `local` 保留原来的本地蓝牙模式。
+5. 在网页重新扫描相机并使用 HA 返回的蓝牙 MAC 地址。macOS 的 BLE UUID 不是 Linux/HA 的 MAC 地址；原有相机记录不会自动改地址。重建记录或在数据文件中更新原记录的 `ble_address` 前请备份数据，避免丢失 COHN 凭据和计划引用。
 
-点击上方 HACS badge，或在 HACS 中添加自定义仓库：
+GoPro 要求每个新 BLE 客户端配对。必要时把相机切换到 GoPro Quik 配对模式，使用 HA 管理员令牌向 `/api/gopro_ble_bridge/execute` 发送 JSON `{"command":"pair","ble_address":"相机MAC地址"}`；相机如有提示需确认。例如，在已设置 `GOPRO_HA_URL` 和 `GOPRO_HA_TOKEN` 环境变量的终端中（将示例地址换为扫描到的地址）：
 
-- Repository: `https://github.com/jarvis2f/ha-gopro`
-- Category: `Integration`
+```sh
+curl --fail-with-body -X POST "$GOPRO_HA_URL/api/gopro_ble_bridge/execute" \
+  -H "Authorization: Bearer $GOPRO_HA_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"command":"pair","ble_address":"EC:EB:B3:69:DE:25"}'
+```
 
-添加后在 HACS 下载 `OpenGoPro`，重启 Home Assistant，然后在 **设置 > 设备与服务 > 添加集成 > OpenGoPro** 中添加集成。
+配对由所选适配器/代理处理，代理固件对加密、配对和保存绑定的支持以及 GoPro 的兼容性需要真机验证。扫描成功不代表配对或唤醒一定成功，跨适配器切换也可能需要重新配对。
 
-### 手动安装
+通过桥接配置 COHN 时页面显示开始与最终结果，中间阶段目前不实时推送。定期唤醒保护需要 HA 提供新收到的相机广播，不能判断时会安全跳过；它不能恢复已超过唤醒窗口的相机。HA 未运行、连接槽耗尽或相机不可见时不会自动切换到本地蓝牙。
 
-1. 将 `custom_components/opengopro` 复制到 Home Assistant 的 `custom_components` 目录。
-2. 重启 Home Assistant。
-3. 在 **设置 > 设备与服务 > 添加集成 > OpenGoPro** 中添加集成。
-4. 使用蓝牙自动发现，或手动输入 BLE 地址。
+## Docker 部署
 
-也可以先在本仓库打包：
+需要 Linux 主机、Docker 和 Docker Compose，以及可用的蓝牙适配器和运行中的系统 D-Bus。主机须能够访问相机的 Wi-Fi 网络或 COHN 局域网。macOS Docker Desktop 通常无法将主机蓝牙提供给 Linux 容器。
 
 ```bash
-venv/bin/python scripts/package_integration.py
+docker compose up -d --build
 ```
 
-然后将 `dist/opengopro-custom-component.zip` 解压到 Home Assistant 配置目录，使最终路径为：
+打开 `http://<主机地址>:8765`。配置和相机凭据保存在 `./data/cameras.json`；备份和迁移时请妥善保护该目录。调度时间使用容器时区，可通过环境变量设置，例如 `TZ=Asia/Shanghai docker compose up -d`。
 
-```text
-config/custom_components/opengopro/manifest.json
-```
-
-当前 zip 的根目录直接包含 `manifest.json`、`__init__.py` 等集成文件。手动安装时请先创建 `config/custom_components/opengopro`，再把 zip 解压到该目录内。
-
-重启 Home Assistant 后，可用 `.env` 中的长期访问令牌做 smoke check：
+Compose 使用 host 网络接收预览 UDP 流、挂载系统 D-Bus，并以 privileged 模式运行以访问蓝牙设备。镜像可单独构建运行：
 
 ```bash
-venv/bin/python scripts/ha_smoke.py
+docker build -t gopro-ctl .
+docker run -d --name gopro-ctl --restart unless-stopped \
+  --network host --privileged \
+  -e TZ=Asia/Shanghai \
+  -v /run/dbus:/run/dbus -v "$PWD/data:/data" gopro-ctl
 ```
 
-## 部署说明
+服务本身没有用户认证，请仅在可信网络中使用，或在反向代理中配置认证并限制网络访问。
 
-当前版本优先面向 Home Assistant OS/Supervised。Home Assistant Container/Core 也可以运行，但蓝牙、主机网络和权限需要由部署者自行配置。
+## 使用
 
-如果不想绑定 Home Assistant，也可以运行独立服务模式。它提供 HTTP API 和网页控制台，未来可作为 Docker 部署和 HA bridge 后端：
+在网页中扫描相机并添加，或对支持的机型执行 COHN 配网。COHN 成功后，服务使用相机返回的局域网 HTTPS 连接信息。页面语言按 `?lang=`、浏览器中保存的语言、浏览器语言的顺序选择，例如 `http://localhost:8765/?lang=zh-Hans`。
+
+预览默认使用 UDP 8554；端口占用时会尝试其他端口，但部分机型只支持默认端口。浏览器需要支持 Media Source Extensions，HEVC 预览还取决于浏览器和系统的解码支持。BLE 配对、COHN 和预览网络路径仍需使用实际相机验证。
+
+媒体弹窗中的视频可以在浏览器内播放，代理会转发 HTTP Range 请求以便分段加载和拖动进度。实际效果取决于相机是否支持文件分段读取、视频的 MP4 索引位置、网络速度以及浏览器对视频编码（如 HEVC）的支持；播放失败时可下载原文件。
+
+在“计划任务”中创建拍摄计划前，请先唤醒相机并连接，以读取可用预设。每项计划可保存预设、自定义参数和视频或延时拍摄时长。日落计划使用手动填写的经纬度离线计算，可设置提前或延后的分钟数；所有时间均使用服务的 `TZ` 时区。计划和最近执行记录保存在数据目录中的 `capture-schedules.json`，需与 `cameras.json` 一同备份；同一数据目录只运行一个服务实例。
+
+选择“高级 Cron”可填写标准五字段表达式 `分 时 日 月 星期`，支持 `*`、列表、范围、步长以及英文月份和星期名称。例如 `0 18 * * *` 为每天 18:00，`0 8,18 * * 1-5` 为工作日 08:00 和 18:00，`*/15 * * * *` 为每 15 分钟。星期日可用 0 或 7；日和星期都受限时，任一匹配即执行。Cron 本身指定时间，与日落触发分开选择。夏令时不存在的本地时间跳过，重复的本地时间只执行第一次。高频任务若与拍摄或其他相机操作重叠可能被跳过；长期停机后，较早的错过记录会合并，最近 90 分钟的错过任务逐次记录，均不补拍。
+
+服务会在目标时间前约两分钟准备相机，拍摄后尝试停止并休眠；错过的任务不会补拍。相机已在拍摄、参数写入失败、无法确认拍摄状态等情况会记录为跳过、失败或结果不确定，请在计划任务的执行记录中检查。成功表示相机接受了快门并恢复空闲，未单独验证媒体文件是否写入 SD 卡。服务重启后会尝试停止中断的定时视频或延时拍摄；若恢复失败，需要手动检查相机。计划依赖服务持续运行、准确的系统时间、相机电源及 BLE/网络连接；精确快门时间、长期供电状态和拍摄结果需用实际相机验证。
+
+只要相机有启用的拍摄计划，服务便为该相机维护一项共享的定期唤醒任务：首次尽快检查，确认相机原本处于休眠后才通过 BLE 唤醒；确认相机空闲、未录制和未预览后再请求休眠，并检查休眠广播。确认成功后约 6 小时再执行；失败或相机已开机时约 15 分钟后重试，临近拍摄或相机被操作时延后。计划列表显示最近状态及下次检查时间；所有计划停用后停止该相机的任务。计时和状态保存在 `capture-schedules.json`，服务停止期间无法执行。若相机已超出 BLE 唤醒窗口、广播没有可识别的电源状态，或其他设备占用连接，需要人工检查；是否能持续刷新唤醒窗口仍需真机长期验证。
+
+每日唤醒可在网页配置，也可调用 API：
 
 ```bash
-venv/bin/python standalone/server.py --host 0.0.0.0 --port 8765 --data data/cameras.json
+curl -X POST http://localhost:8765/api/cameras/<camera_id>/wake-schedule \
+  -H 'Content-Type: application/json' \
+  -d '{"target_time":"18:00","guard_lead_hours":6}'
 ```
 
-详见 [STANDALONE.md](STANDALONE.md)。
+关闭调度时发送 `{"enabled":false}`。拍摄计划接口包括 `/api/schedules` 和 `/api/schedules/{schedule_id}`，历史记录为 `/api/schedules/{schedule_id}/history`。其他主要接口包括 `/api/health`、`/api/cameras`、`/api/scan`、`/api/cohn/provision`，以及 `/api/cameras/{camera_id}/state`、`media`、`preview/status`、`preview.ts` 和 `command`。
 
-## 开发
+## 开发与验证
 
-本项目刻意将客户端层设计为可替换结构：
+`src/client.py`、`src/protocol.py`、`src/models.py` 和 `src/state.py` 实现相机协议与状态归一化；`src/server.py` 提供 HTTP API；`src/ble_runtime.py` 和 `src/ble_worker.py` 处理 BLE 操作；`src/preview.py` 和 `src/static/` 提供预览与控制台。
 
-- `client.py` 包含 BLE/HTTP OpenGoPro 传输逻辑。
-- `protocol.py` 集中维护 OpenGoPro UUID、BLE 命令、HTTP 参数、状态 ID 和设置 ID。
-- `models.py` 定义异常、连接阶段、凭据、媒体项、Wi-Fi 扫描结果和归一化快照。
-- `state.py` 负责把相机 HTTP 状态 payload 归一化为 `CameraSnapshot`。
-- `coordinator.py` 负责生命周期、状态轮询和 Keep Alive。
-- `preview.py` 管理 Home Assistant 侧 Live Preview UDP 监听、订阅和 MPEG-TS relay。
-- `button.py`、`switch.py`、`select.py`、`sensor.py`、`binary_sensor.py` 将 coordinator 映射为 Home Assistant 实体。
-- `media_source.py` 将相机媒体列表暴露给 Home Assistant Media Browser。
-- `preview_proxy.py` 将本地 MPEG-TS 预览流通过 Home Assistant 认证 HTTP view 暴露给面板。
-- `frontend/opengopro-console.js` 是 Home Assistant 和 standalone 共用的控制台 Web Component。
-- `frontend/opengopro-console-styles.js` 只保存共享控制台样式。
-- `frontend/panel.js` 是 Home Assistant 侧边栏 adapter。
-- `frontend/vendor/mpegts.min.js` 是面板播放 MPEG-TS 预览所需的本地 vendored 前端库。
-- `strings.json` 和 `translations/*.json` 提供 Home Assistant 后端翻译；共享控制台的运行时文案字典保留在 `frontend/opengopro-console.js`。
-
-standalone 侧入口保持在 `standalone/server.py`，但实现已按职责拆分：
-
-- `standalone/ble_process.py` 管理短生命周期 BLE worker 子进程和进度流。
-- `standalone/preview.py` 管理 Live Preview UDP 监听、订阅和 MPEG-TS HTTP relay。
-- `standalone/store.py` 管理相机配置持久化。
-
-OpenGoPro 的 BLE GATT 命令常量会随 API 版本和相机固件差异变化。v1 将这些调用隔离在客户端层，便于后续用真实设备 trace 强化命令编码，而不影响 Home Assistant 实体、服务和前端接口。
-
-## Home Assistant 自动化示例
-
-如果相机一天内只需要在固定时间醒来，建议使用两条 Automation：
-
-```yaml
-alias: GoPro guard wake
-trigger:
-  - platform: time
-    at: "12:00:00"
-action:
-  - service: opengopro.guard_wake
-    data:
-      name: GoPro
-      hold: 3
+```bash
+venv/bin/python -m pip install -r requirements-dev.txt
+venv/bin/python -m compileall src tests
+venv/bin/python -m pytest -q
+venv/bin/python src/server.py --help
 ```
-
-```yaml
-alias: GoPro target wake
-trigger:
-  - platform: time
-    at: "18:00:00"
-action:
-  - service: opengopro.wake
-    data:
-      name: GoPro
-```
-
-`guard_wake` 用于在目标时间前刷新 GoPro 睡眠后的 BLE 可唤醒窗口；真正使用相机时仍调用 `opengopro.wake`。
-
-## Live Preview
-
-Home Assistant 面板和 standalone 网页控制台都直接接收 GoPro 原生 UDP MPEG-TS 预览数据，并通过认证 HTTP endpoint 转给浏览器播放：
-
-- Home Assistant：`/api/opengopro/preview/{entry_id}.ts`
-- standalone：`/api/cameras/{camera_id}/preview.ts`
-
-HERO9、HERO10、HERO11 和 HERO11 Mini 不支持自定义预览端口，因此默认 UDP `8554` 是最兼容路径。运行 HA 的主机必须能接收相机发来的 UDP preview 数据；如果跨网段、容器网络或防火墙阻断 UDP，面板会显示 relay 状态错误。
-
-### HERO12 及更新机型的 COHN 模式
-
-HERO12 及更新机型支持 OpenGoPro 的 COHN（Camera on the Home Network）能力，可以让相机作为 Wi-Fi Station 加入家庭网络。完成 COHN provisioning 后，Home Assistant 不需要切换到 GoPro 自己的 AP 网络，而是通过局域网 HTTPS 访问相机。
-
-当前集成已支持手动填写 COHN 连接参数：
-
-- `HTTP 协议`：`https`
-- `相机 HTTP 主机`：COHN 状态返回的局域网 IP，例如 `192.168.50.103`
-- `HTTP 端口`：通常为 `443`
-- `HTTP 用户名` / `HTTP 密码`：COHN provisioning 返回的 Basic Auth 凭据
-- `校验 HTTPS 证书`：首次联调可以关闭；生产使用应保存并校验 GoPro 返回的 COHN 证书

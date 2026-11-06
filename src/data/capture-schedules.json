@@ -1,0 +1,105 @@
+{
+  "schedules": [
+    {
+      "name": "测试",
+      "camera_id": "d34f433d56364ac685a38f0a1559689b",
+      "mode": "photo",
+      "repeat": "cron",
+      "weekdays": [],
+      "date": null,
+      "trigger": "cron",
+      "time": null,
+      "cron_expression": "*/5 * * * *",
+      "latitude": null,
+      "longitude": null,
+      "offset_minutes": null,
+      "preset": "65536",
+      "preset_identity": "PRESET_TITLE_PHOTO",
+      "settings": {},
+      "duration_seconds": null,
+      "enabled": false,
+      "id": "a188af2aa23c45979094dbb97fc4553d",
+      "created_at": "2026-10-28T10:42:55.915282+08:00",
+      "processed_dates": [],
+      "cron_cursor": "2026-10-28T11:05:00+08:00"
+    }
+  ],
+  "history": [
+    {
+      "id": "771de8b2e49a4db2b035c56a7db019ca",
+      "schedule_id": "a188af2aa23c45979094dbb97fc4553d",
+      "camera_id": "d34f433d56364ac685a38f0a1559689b",
+      "mode": "photo",
+      "occurrence_date": "2026-10-28",
+      "scheduled_at": "2026-10-28T10:45:00+08:00",
+      "started_at": null,
+      "finished_at": "2026-10-28T10:45:15.012273+08:00",
+      "status": "failed",
+      "error": "HTTP request failed: https://192.168.2.162:443/gopro/camera/state; sleep failed: HTTP request failed: https://192.168.2.162:443/gp/gpControl/command/system/sleep",
+      "shutter_sent": false,
+      "camera_prepared": true
+    },
+    {
+      "id": "d18eb3b2928a4dc7b6aaa2d5781fa4d1",
+      "schedule_id": "a188af2aa23c45979094dbb97fc4553d",
+      "camera_id": "d34f433d56364ac685a38f0a1559689b",
+      "mode": "photo",
+      "occurrence_date": "2026-10-28",
+      "scheduled_at": "2026-10-28T10:50:00+08:00",
+      "started_at": "2026-10-28T10:50:00.045306+08:00",
+      "finished_at": "2026-10-28T10:50:03.873929+08:00",
+      "status": "success",
+      "error": null,
+      "shutter_sent": true,
+      "camera_prepared": true
+    },
+    {
+      "id": "9b49f21941f147cbbdd5dc8c1840a9a4",
+      "schedule_id": "a188af2aa23c45979094dbb97fc4553d",
+      "camera_id": "d34f433d56364ac685a38f0a1559689b",
+      "mode": "photo",
+      "occurrence_date": "2026-10-28",
+      "scheduled_at": "2026-10-28T10:55:00+08:00",
+      "started_at": "2026-10-28T10:55:00.066573+08:00",
+      "finished_at": "2026-10-28T10:55:03.955703+08:00",
+      "status": "success",
+      "error": null,
+      "shutter_sent": true,
+      "camera_prepared": true
+    },
+    {
+      "id": "da1cd09c2dc549279a9cbb0f317f9c3a",
+      "schedule_id": "a188af2aa23c45979094dbb97fc4553d",
+      "camera_id": "d34f433d56364ac685a38f0a1559689b",
+      "mode": "photo",
+      "occurrence_date": "2026-10-28",
+      "scheduled_at": "2026-10-28T11:00:00+08:00",
+      "started_at": "2026-10-28T11:00:00.055843+08:00",
+      "finished_at": "2026-10-28T11:00:03.938669+08:00",
+      "status": "success",
+      "error": null,
+      "shutter_sent": true,
+      "camera_prepared": true
+    },
+    {
+      "id": "5a54330ff31d490d84f4370d80c62c4e",
+      "schedule_id": "a188af2aa23c45979094dbb97fc4553d",
+      "camera_id": "d34f433d56364ac685a38f0a1559689b",
+      "mode": "photo",
+      "occurrence_date": "2026-10-28",
+      "scheduled_at": "2026-10-28T11:05:00+08:00",
+      "started_at": "2026-10-28T11:05:00.061865+08:00",
+      "finished_at": "2026-10-28T11:05:05.086962+08:00",
+      "status": "success",
+      "error": null,
+      "shutter_sent": true,
+      "camera_prepared": true
+    }
+  ],
+  "wake_guards": {
+    "d34f433d56364ac685a38f0a1559689b": {
+      "status": "disabled",
+      "next_at": null
+    }
+  }
+}

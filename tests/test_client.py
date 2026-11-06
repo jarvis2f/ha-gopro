@@ -1,11 +1,12 @@
 import pytest
 
-from custom_components.opengopro.client import (
+from client import (
     CameraMediaItem,
     CameraSnapshot,
     ConnectionPhase,
     OpenGoProClient,
     OpenGoProCommandError,
+    OpenGoProConnectionError,
     WifiScanEntry,
     _BlePacketAccumulator,
     _decode_protobuf_fields,
@@ -14,12 +15,13 @@ from custom_components.opengopro.client import (
     _proto_string,
     _packetize_ble_payload,
 )
-from custom_components.opengopro.protocol import (
+from protocol import (
     BLE_CMD_KEEP_ALIVE,
     BLE_CMD_SET_AP_CONTROL,
     BLE_CMD_SLEEP,
     BLE_KEEP_ALIVE_VALUE,
     GOPRO_COMMAND_UUID,
+    GOPRO_QUERY_UUID,
     GOPRO_SETTING_UUID,
 )
 
@@ -150,6 +152,7 @@ async def test_ble_connect_uses_retry_connector(monkeypatch):
         ble_address="AA:BB",
         name="GoPro Test",
         ble_device_callback=lambda: ble_device,
+        ble_pair=True,
     )
 
     await client.async_ble_connect()
@@ -157,8 +160,33 @@ async def test_ble_connect_uses_retry_connector(monkeypatch):
     assert calls["device"] is ble_device
     assert calls["name"] == "GoPro Test"
     assert calls["kwargs"]["ble_device_callback"] is client._ble_device_callback
+    assert calls["kwargs"]["pair"] is True
     assert client._ble_client is connected_client
     assert client.phase == ConnectionPhase.BLE_CONNECTED
+
+
+@pytest.mark.asyncio
+async def test_ble_connect_reports_pairing_error_and_disconnects(monkeypatch):
+    import bleak_retry_connector
+
+    class UnpairedClient(FakeBleClient):
+        async def start_notify(self, uuid, callback):
+            raise RuntimeError("Encryption is insufficient.")
+
+    connected_client = UnpairedClient()
+
+    async def fake_establish_connection(*args, **kwargs):
+        return connected_client
+
+    monkeypatch.setattr(bleak_retry_connector, "establish_connection", fake_establish_connection)
+    client = OpenGoProClient(session=None, ble_address="AA:BB", ble_device=object())  # type: ignore[arg-type]
+
+    with pytest.raises(OpenGoProConnectionError, match="配对或加密认证失败"):
+        await client.async_ble_connect()
+
+    assert connected_client.disconnected
+    assert client.last_notification_trace[0]["error"] == "Encryption is insufficient."
+    assert client.phase == ConnectionPhase.DISCONNECTED
 
 
 def test_packetize_always_uses_extended_headers():
@@ -233,6 +261,39 @@ async def test_scan_access_points_uses_scan_id_from_scan_notify():
     assert entries[0].is_configured is True
     assert trace[1]["fields"] == {"1": 1, "2": 2}
     assert trace[2]["fields"] == {"1": 5, "2": 7, "3": 1}
+
+
+@pytest.mark.asyncio
+async def test_get_wifi_scan_status_reads_camera_status_values():
+    client = OpenGoProClient(session=None, ble_address="AA:BB")  # type: ignore[arg-type]
+    writes = []
+
+    async def fake_write(uuid, payload):
+        writes.append((uuid, payload))
+
+    async def fake_next(**kwargs):
+        return bytes([0x13, 0, 22, 1, 5, 23, 1, 1])
+
+    client._ble_write_payload = fake_write
+    client._ble_next_payload = fake_next
+    assert await client.async_get_wifi_scan_status() == {"22": 5, "23": 1}
+    assert writes == [(GOPRO_QUERY_UUID, bytes([0x13, 8, 10, 17, 22, 23, 82, 115, 116]))]
+
+
+@pytest.mark.asyncio
+async def test_hardware_version_excludes_serial_number():
+    client = OpenGoProClient(session=None, ble_address="AA:BB")  # type: ignore[arg-type]
+
+    async def fake_write(uuid, payload):
+        assert (uuid, payload) == (GOPRO_COMMAND_UUID, bytes([0x3C]))
+
+    async def fake_next(**kwargs):
+        fields = (b"1", b"HERO12 Black", b"0", b"2.44", b"serial")
+        return bytes([0x3C, 0]) + b"".join(bytes([len(x)]) + x for x in fields)
+
+    client._ble_write_payload = fake_write
+    client._ble_next_payload = fake_next
+    assert await client.async_get_hardware_version() == {"model": "HERO12 Black", "firmware": "2.44"}
 
 
 @pytest.mark.asyncio
@@ -636,3 +697,11 @@ async def test_list_media_parses_files_and_types():
         "video/mp4",
         "video/mp4",
     ]
+
+
+@pytest.mark.asyncio
+async def test_delete_media_encodes_camera_path():
+    session = FakeSession([FakeResponse()])
+    client = OpenGoProClient(session=session, ble_address='AA:BB')
+    await client.async_delete_media('100GOPRO/a & b.JPG')
+    assert session.urls == ['http://10.5.5.9:8080/gopro/media/delete/file?path=100GOPRO%2Fa+%26+b.JPG']

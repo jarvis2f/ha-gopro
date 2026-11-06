@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+venv
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.env
+data
+dist
+*.crt
+*.key
+*.pem

@@ -1,0 +1,5 @@
+aiohttp==3.13.5
+astral==3.2
+croniter==6.2.4
+bleak==2.1.1
+bleak-retry-connector==4.6.0

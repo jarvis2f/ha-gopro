@@ -1,11 +1,10 @@
-from standalone.store import CameraStore
-from standalone.preview import PreviewManager, _free_udp_port
+from store import CameraStore
+from preview import PreviewManager, _free_udp_port
 from datetime import datetime
 
-from standalone.server import _due_wake_events, _guard_time, media_payload
+from server import _due_wake_events, _guard_time, media_payload
 
-from custom_components.opengopro.client import CameraMediaItem
-from custom_components.opengopro.preview import OpenGoProPreviewManager, PreviewSession
+from client import CameraMediaItem
 
 
 def test_camera_store_add_redacts_nothing_and_persists(tmp_path):
@@ -81,33 +80,6 @@ def test_preview_manager_status_reports_preview_availability():
     assert isinstance(status["available"], bool)
 
 
-def test_ha_preview_manager_status_and_subscribe():
-    class FakeTransport:
-        def __init__(self):
-            self.closed = False
-
-        def is_closing(self):
-            return self.closed
-
-        def close(self):
-            self.closed = True
-
-    manager = OpenGoProPreviewManager()
-    session = PreviewSession("entry-1", 45678, FakeTransport())
-    manager._sessions["entry-1"] = session
-
-    status = manager.status("entry-1")
-
-    assert status["running"] is True
-    assert status["port"] == session.port
-    assert status["stream_url"] == "/api/opengopro/preview/entry-1.ts"
-
-    queue = manager.subscribe("entry-1")
-    manager.unsubscribe("entry-1", queue)
-    session.transport.close()
-    assert manager.status("entry-1")["running"] is False
-
-
 def test_free_udp_port_uses_ephemeral_socket(monkeypatch):
     class FakeSocket:
         def __enter__(self):
@@ -122,7 +94,7 @@ def test_free_udp_port_uses_ephemeral_socket(monkeypatch):
         def getsockname(self):
             return ("0.0.0.0", 45678)
 
-    monkeypatch.setattr("standalone.preview.socket.socket", lambda *_: FakeSocket())
+    monkeypatch.setattr("preview.socket.socket", lambda *_: FakeSocket())
 
     port = _free_udp_port()
 

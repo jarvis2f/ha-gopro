@@ -1,7 +1,0 @@
-{
-  "name": "OpenGoPro",
-  "zip_release": true,
-  "filename": "opengopro-custom-component.zip",
-  "homeassistant": "2024.8.0",
-  "hacs": "2.0.0"
-}

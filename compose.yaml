@@ -1,0 +1,16 @@
+services:
+  gopro-ctl:
+    build: .
+    image: gopro-ctl:local
+    container_name: gopro-ctl
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      GOPRO_BLE_BACKEND: ${GOPRO_BLE_BACKEND:-local}
+      GOPRO_HA_URL: ${GOPRO_HA_URL:-}
+      GOPRO_HA_TOKEN: ${GOPRO_HA_TOKEN:-}
+    volumes:
+      - /run/dbus:/run/dbus
+      - ./data:/data

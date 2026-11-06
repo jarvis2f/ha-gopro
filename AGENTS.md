@@ -2,88 +2,34 @@
 
 ## 项目概览
 
-本仓库是一个 Home Assistant 自定义集成，集成域名为 `opengopro`。
-它面向兼容 OpenGoPro 的 GoPro 相机，通过 BLE 完成发现、唤醒和连接流程，
-并通过相机 HTTP API 完成控制、状态读取和媒体访问。
+gopro-ctl 是通过 Docker 部署的 GoPro 控制服务，使用 BLE 发现、唤醒和连接相机，并通过 OpenGoPro HTTP API 控制相机、读取状态和访问媒体。
 
-主要代码位于 `custom_components/opengopro`。
+## 结构
 
-## 仓库结构
+- `src/client.py`、`src/protocol.py`、`src/models.py`、`src/state.py`：BLE/HTTP 协议及状态归一化。
+- `src/server.py`：HTTP API 和服务生命周期。
+- `src/ble_runtime.py`、`src/ble_process.py`、`src/ble_worker.py`：BLE 操作和 worker。
+- `src/preview.py`：UDP MPEG-TS 预览 relay。
+- `src/store.py`：相机配置持久化。
+- `src/static/`：网页控制台和本地播放器。
+- `Dockerfile`、`compose.yaml`：容器构建和部署。
+- `tests/`：协议与服务测试。
 
-- `custom_components/opengopro/__init__.py`：Home Assistant 集成初始化、服务注册、WebSocket API 注册、前端静态资源注册、媒体代理注册。
-- `custom_components/opengopro/client.py`：OpenGoPro BLE/HTTP 传输层和相机状态归一化。
-- `custom_components/opengopro/coordinator.py`：生命周期、状态轮询、媒体缓存和 Keep Alive 循环。
-- `custom_components/opengopro/{button,switch,select,sensor,binary_sensor}.py`：Home Assistant 实体平台。
-- `custom_components/opengopro/media_source.py`：Home Assistant Media Browser 数据源。
-- `custom_components/opengopro/media_proxy.py`：通过 Home Assistant 认证代理相机媒体文件。
-- `custom_components/opengopro/preview.py`：Home Assistant 侧 UDP MPEG-TS Live Preview relay。
-- `custom_components/opengopro/preview_proxy.py`：通过 Home Assistant 认证暴露预览状态和 `.ts` 流。
-- `custom_components/opengopro/frontend/panel.js`：侧边栏面板 Web Component。
-- `custom_components/opengopro/frontend/vendor/mpegts.min.js`：HA 面板播放 MPEG-TS 预览所需的本地前端库。
-- `tests/`：轻量级客户端测试。
-- `requirements-dev.txt`：开发和验证依赖，版本与当前验证过的 Home Assistant 版本对齐。
-- `scripts/package_integration.py`：打包 `custom_components/opengopro`。
-- `scripts/ha_smoke.py`：用 `.env` 中的 Home Assistant token 做远程 smoke check。
-- `standalone/`：不依赖 Home Assistant 实例的 HTTP API、BLE worker、UDP MPEG-TS 预览 relay、每日 wake schedule 和网页控制台，复用 OpenGoPro 客户端能力。
-- `STANDALONE.md`：独立服务和未来 Docker 部署说明。
+## 验证
 
-## 开发环境
+使用本地虚拟环境执行 `venv/bin/python -m compileall src tests`、`venv/bin/python -m pytest -q` 和 `venv/bin/python src/server.py --help`。Docker、Linux、蓝牙或网络相关验证在 pve-dev 测试服务器进行，不要在本地使用 Docker。
 
-如果本地存在虚拟环境，优先使用它：
+## 构建与发布
 
-```bash
-venv/bin/python -m pip install -r requirements-dev.txt
-```
-
-当前验证环境为 Python 3.14，Home Assistant 版本为 `2026.5.2`。
-
-## 验证命令
-
-交付修改前运行：
-
-```bash
-venv/bin/python -m compileall custom_components standalone scripts tests
-venv/bin/python -m pytest -q
-venv/bin/python scripts/ha_smoke.py
-```
-
-独立服务最小验证：
-
-```bash
-venv/bin/python standalone/server.py --help
-```
-
-最小 Home Assistant 配置检查：
-
-```bash
-tmpdir=$(mktemp -d /private/tmp/ha-gopro-check.XXXXXX)
-mkdir -p "$tmpdir/custom_components"
-ln -s "$PWD/custom_components/opengopro" "$tmpdir/custom_components/opengopro"
-printf 'opengopro:\n' > "$tmpdir/configuration.yaml"
-venv/bin/python -m homeassistant --config "$tmpdir" --script check_config
-```
-
-本地配置检查时不要默认使用 `default_config:`，除非确实需要验证大量 Home Assistant 内置集成依赖；否则它会安装许多与本项目无关的包，干扰判断。
+- 在 `pve-dev` 上使用仓库的 `Dockerfile` 构建 Linux 镜像；不要在本地运行 Docker。构建上下文只需 `Dockerfile`、`requirements.txt` 和 `src/`，不要包含 `data/` 或凭据。
+- 为每次发布使用可识别的镜像标签，通过 `docker save` 导出并传输到 `pve-debian12-prod`，校验 SHA-256 后使用 `docker load` 导入。可通过 MCP 上传和下载中转；不要编写脚本手动调用 MCP 或发送 JSON-RPC。
+- 生产部署目录为 `/docker/gopro-ctl`，使用该目录的 `compose.yaml` 管理容器。更新镜像前先备份现有 Compose 文件，保留其中的网络、环境文件、日志及其他生产配置，然后执行 `docker compose up -d --no-build`。保留旧镜像和配置以便回退。
+- 服务使用 host 网络，监听内网地址 `192.168.2.123:9898`；数据持久化在 `/docker/gopro-ctl/data`，容器内挂载为 `/data`。保留现有的 `cameras.json`、`capture-schedules.json` 和 `gopro-ctl.env`，不要覆盖、公开或提交其中的凭据。
+- 发布后检查容器状态和日志，从另一台内网主机访问 `http://192.168.2.123:9898/api/health`，并确认已有相机和定时任务仍可读取。涉及相机的实际 BLE、媒体删除和预览功能仍须按需使用真机验证。清理本次传输产生的临时镜像包。
 
 ## 实现约束
 
-- 涉及到 BLE 连接、HTTP 接口的改动，必须直接查询 GoPro 官方 ![OpenGoPro](https://gopro.github.io/OpenGoPro/docs/ble/networking) 文档，不要自己猜测或参考第三方库的实现细节。
-- 后续每个改动都必须同时考虑 Home Assistant 集成和 standalone 独立服务。共享能力优先放在 `custom_components/opengopro/client.py` 这类纯协议层；HA 层不得 import `standalone/*`，standalone 层不得依赖 HA runtime。
-- 共享前端 UI 放在 `custom_components/opengopro/frontend/opengopro-console.js`。HA 的 `panel.js` 和 standalone 的 `standalone/static/index.html` 只能作为 adapter，不要复制两套 UI。
-- 硬件相关的 BLE GATT 命令编码必须集中在 `client.py`，不要散落到实体或前端代码中。
-- 不要在实体或前端中直接使用 OpenGoPro 原始状态 ID；先通过 `CameraSnapshot` 归一化。
-- 侧边栏面板应通过 Home Assistant WebSocket 命令和服务交互，不要直接从浏览器访问相机。
-- 媒体文件必须通过 `media_proxy.py` 走 Home Assistant 认证代理，不要让浏览器直接访问相机的未认证地址。
-- Home Assistant 侧已经实现 Live Preview：通过 `custom_components/opengopro/preview.py` 接收 GoPro UDP MPEG-TS datagram，并通过认证 HTTP view 输出 `.ts` 给浏览器。
-- standalone 侧也通过 `standalone/preview.py` 做 UDP MPEG-TS relay。两侧可以共享协议理解和前端组件，但 HA 层不得 import `standalone/*` runtime。
-- 定时唤醒在 HA 侧优先使用 Home Assistant Automation 组合 `opengopro.guard_wake` 和 `opengopro.wake`；standalone 的 wake schedule 只服务独立模式。
-- 相机可见 Wi-Fi AP 扫描目前按官方 BLE protobuf 路径实现，不要猜测不存在的 HTTP endpoint。
-- Home Assistant API 变化较快，修改后要用当前安装的 HA 包验证导入、签名和最小 `check_config`。
-
-## 当前已知缺口
-
-- `OpenGoProClient.async_enable_wifi` 已按官方 Set AP Control TLV 命令写入，但尚未用真机验证 response notify、pairing 复用和 AP 启动时序。
-- HTTP 状态归一化已按官方常见状态 ID 修正，仍需要用真实相机 payload 校准机型差异。
-- Home Assistant 和 standalone 的 MPEG-TS preview relay 已实现，但仍需用真实相机验证 AP/COHN/容器网络下的 UDP 收包路径。
-- 当前测试已覆盖客户端、媒体源和 WebSocket payload 的关键路径，但还没有完整 Home Assistant runtime 测试夹具。
-- 本仓库尚未完成真实 GoPro 硬件联调。
+- 涉及 BLE 连接或 HTTP 接口的改动必须直接查询 [GoPro 官方 OpenGoPro 文档](https://gopro.github.io/OpenGoPro/docs/ble/networking)。
+- BLE GATT 命令编码集中在客户端协议层，状态先通过 `CameraSnapshot` 归一化。
+- 相机可见 Wi-Fi AP 扫描使用官方 BLE protobuf 路径。
+- 不在仓库提交相机凭据。BLE 配对、COHN 和预览 UDP 网络路径仍需真机验证。

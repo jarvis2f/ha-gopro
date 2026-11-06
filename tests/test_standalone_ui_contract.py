@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def test_standalone_camera_list_does_not_request_state():
-    html = Path("standalone/static/index.html").read_text(encoding="utf-8")
+    html = Path("src/static/index.html").read_text(encoding="utf-8")
 
     list_start = html.index("listCameras: async () =>")
     load_state_start = html.index("loadState: async", list_start)
@@ -15,13 +15,13 @@ def test_standalone_camera_list_does_not_request_state():
 
 
 def test_standalone_presence_timeout_allows_http_then_ble_probe():
-    html = Path("standalone/static/index.html").read_text(encoding="utf-8")
+    html = Path("src/static/index.html").read_text(encoding="utf-8")
 
     assert 'optionalApi(`/api/cameras/${id}/presence`, 12000)' in html
 
 
 def test_standalone_ui_chooses_locale_before_adapter_setup():
-    html = Path("standalone/static/index.html").read_text(encoding="utf-8")
+    html = Path("src/static/index.html").read_text(encoding="utf-8")
 
     assert 'params.get("lang")' in html
     assert 'window.localStorage.getItem("opengopro_locale")' in html
